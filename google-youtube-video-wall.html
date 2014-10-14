@@ -1,0 +1,504 @@
+<link rel="import" href="../core-ajax/core-ajax.html">
+<link rel="import" href="../core-animated-pages/core-animated-pages.html">
+<link rel="import" href="../core-header-panel/core-header-panel.html">
+<link rel="import" href="../core-icon-button/core-icon-button.html">
+<link rel="import" href="../core-icon/core-icon.html">
+<link rel="import" href="../core-icons/core-icons.html">
+<link rel="import" href="../core-icons/av-icons.html">
+<link rel="import" href="../core-media-query/core-media-query.html">
+<link rel="import" href="../core-toolbar/core-toolbar.html">
+<link rel="import" href="../font-roboto/roboto.html">
+<link rel="import" href="../google-youtube/google-youtube.html">
+<link rel="import" href="../paper-fab/paper-fab.html">
+<link rel="import" href="../paper-input/paper-input.html">
+<link rel="import" href="../paper-slider/paper-slider.html">
+<link rel="import" href="../paper-ripple/paper-ripple.html">
+<link rel="import" href="../paper-shadow/paper-shadow.html">
+<link rel="import" href="../polymer/polymer.html">
+
+
+<!--
+A video wall with [Material Design](http://www.google.com/design/spec/material-design/introduction.html) styling.
+It uses the Polymer [paper elements](https://www.polymer-project.org/docs/elements/paper-elements.html) for the interface,
+and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searches to populate the list of videos.
+
+##### Example
+
+    <google-youtube-video-wall apiKey="YOUTUBE API KEY"
+                               headerTitle="Google Developers Videos"
+                               channelId="UC_x5XG1OV2P6uZZ5FSM9Ttw"
+                               q="iobytes"
+                               showSearch>
+    </google-youtube-video-wall>
+
+@element google-youtube-video-wall
+@blurb An element for displaying collections of YouTube videos.
+@status alpha
+@homepage https://github.com/googlewebcomponents/google-youtube-video-wall
+-->
+
+<polymer-element name="google-youtube-video-wall"
+                 attributes="apiKey channelId location locationRadius maxResults maxVideos narrowWidth order publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
+  <template>
+    <link rel="stylesheet" href="google-youtube-video-wall.css">
+
+    <core-media-query query="max-width: {{narrowWidth}}" queryMatches="{{narrow}}"></core-media-query>
+    <core-media-query query="max-width: {{veryNarrowWidth}}" queryMatches="{{veryNarrow}}"></core-media-query>
+
+    <core-animated-pages fit
+                         id="corepage"
+                         transitions="hero-transition cross-fade"
+                         selected="0"
+                         on-core-animated-pages-transition-end="{{handleTransitionEnd}}">
+      <section>
+        <core-header-panel id="resultspage" fit cross-fade>
+          <core-toolbar class="{{ {'medium-tall': narrow && showSearch} | tokenList }}">
+            <header flex>{{wallTitle}}</header>
+
+            <template if="{{showSearch}}">
+              <core-icon icon="search" class="{{ {bottom: narrow} | tokenList }}"></core-icon>
+              <paper-input class="{{ {bottom: narrow} | tokenList }}"
+                           placeholder="Search for..."
+                           value="{{q}}">
+              </paper-input>
+            </template>
+          </core-toolbar>
+
+          <div id="searchresults" class="{{ {veryNarrow: veryNarrow} | tokenList }}">
+            <template if="{{_apiError}}">
+              <h1>Oops! The following error occurred:</h1>
+              <pre>{{_apiError}}</pre>
+            </template>
+
+            <template if="{{_videos != null && _videos.length == 0}}">
+              <h1>Sorry, no videos were found!</h1>
+            </template>
+
+            <template repeat="{{video in _videos}}">
+              <div class="video-container"
+                       data-video-id="{{video.id.videoId}}"
+                       data-video-title="{{video.snippet.title}}"
+                       on-tap="{{handleItemSelected}}">
+                <paper-shadow z="1"></paper-shadow>
+                <paper-ripple fit></paper-ripple>
+
+                <img src="{{video.snippet.thumbnails.medium.url}}"
+                     hero-id="{{video.id.videoId}}"
+                     hero>
+                <div class="text-container">
+                  <h1>{{video.snippet.title}}</h1>
+                  <p>{{video.snippet.description}}</p>
+                </div>
+              </div>
+            </template>
+          </div>
+        </core-header-panel>
+      </section>
+
+      <section>
+        <div id="playerpage" fit cross-fade class="{{ {narrow: narrow} | tokenList }}">
+          <template if="{{_selectedVideoId}}">
+            <paper-icon-button id="close-button"
+                               icon="close"
+                               on-tap="{{handlePlayerClose}}">
+            </paper-icon-button>
+
+            <google-youtube id="youtubeplayer"
+                            videoid="{{_selectedVideoId}}"
+                            chromeless
+                            width="100%"
+                            height="100%"
+                            currenttime="{{currentTime}}"
+                            currenttimeformatted="{{currentTimeFormatted}}"
+                            fractionloaded="{{fractionLoaded}}"
+                            state="{{state}}"
+                            duration="{{duration}}"
+                            durationformatted="{{durationFormatted}}"
+                            hero-id="{{_selectedVideoId}}"
+                            hero>
+            </google-youtube>
+          </template>
+
+          <paper-slider id="seekbar"
+                        min="0"
+                        max="{{duration}}"
+                        value="{{currentTime}}"
+                        secondaryProgress="{{ fractionLoaded * duration }}"
+                        on-change="{{handleSeekTo}}"
+                        disabled?="{{duration == 0}}">
+          </paper-slider>
+
+          <core-toolbar id="playercontrols" class="{{ {'medium-tall': narrow} | tokenList }}">
+            <template if="{{state == 1 || state == 3}}">
+              <paper-fab class="{{ {bottom: narrow, mini: true} | tokenList }}"
+                         icon="av:pause"
+                         on-tap="{{handlePause}}">
+              </paper-fab>
+            </template>
+
+            <template if="{{state != 1 && state != 3}}">
+              <paper-fab class="{{ {bottom: narrow, mini: true} | tokenList }}"
+                         icon="av:play-arrow"
+                         on-tap="{{handlePlay}}">
+              </paper-fab>
+            </template>
+
+            <p flex>{{_selectedVideoTitle}}</p>
+
+            <p class="{{ {bottom: narrow} | tokenList }}" hidden?="{{duration == 0}}">{{currentTimeFormatted}}/{{durationFormatted}}</p>
+          </core-toolbar>
+        </div>
+      </section>
+    </core-animated-pages>
+
+    <template if="{{_youtubeApiSearchParams}}">
+      <core-ajax auto
+                 url="https://www.googleapis.com/youtube/v3/search"
+                 params="{{_youtubeApiSearchParams}}"
+                 handleAs="json"
+                 on-core-response="{{handleSearchResponse}}"
+                 on-core-error="{{handleSearchError}}">
+      </core-ajax>
+    </template>
+  </template>
+
+  <script>
+      Polymer({
+        /**
+         * API key to use for YouTube Data API v3 calls.
+         *
+         * Setting this value to an API key that you register for is required.
+         * Also ensure that the Google Developers Console project associated with the key
+         * has the YouTube Data API v3 enabled.
+         *
+         * More information on registration is available in the [YouTube API documentation](https://developers.google.com/youtube/registering_an_application).
+         *
+         * @attribute apiKey
+         * @type string
+         * @default ''
+         */
+        apiKey: '',
+
+        /**
+         * An optional search filter which limits the results to videos in a single YouTube channel.
+         *
+         * The value must be a valid YouTube channel id, *not* a channel name (which is not guaranteed to be unique).
+         * YouTube channel ids traditionally begin with the characters 'UC'.
+         * An easy way to look up the channel id for a given channel name is to use the [API Explorer](https://developers.google.com/apis-explorer/#p/youtube/v3/youtube.channels.list?part=id&forUsername=GoogleDevelopers)
+         * with the `forUsername` field set to the channel name you're interested in.
+         *
+         * This corresponds to the [`channelId`](https://developers.google.com/youtube/v3/docs/search/list#channelId)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute channelId
+         * @type string
+         * @default ''
+         */
+        channelId: '',
+
+        /**
+         * An optional search filter which limits the results to geotagged videos that are close to a specific location.
+         *
+         * To use this, you must set the `locationRadius` property as well.
+         *
+         * This corresponds to the [`location`](https://developers.google.com/youtube/v3/docs/search/list#location)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute location
+         * @type string
+         * @default ''
+         */
+        location: '',
+
+        /**
+         * An optional search filter which limits the results to geotagged videos that are close to a specific location.
+         *
+         * To use this, you must set the `location` property as well.
+         *
+         * This corresponds to the [`locationRadius`](https://developers.google.com/youtube/v3/docs/search/list#location)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute locationRadius
+         * @type string
+         * @default ''
+         */
+        locationRadius: '',
+
+        /**
+         * The maximum number of videos to retrieve in total.
+         *
+         * @attribute maxVideos
+         * @type number
+         * @default 500
+         */
+        maxVideos: 500,
+
+        /**
+         * The maximum number of videos to retrieve in a single API call.
+         *
+         * It's recommended to leave this value at the default.
+         *
+         * Valid values are `1` through `50`, inclusive.
+         *
+         * @attribute maxResultsPerRequest
+         * @type number
+         * @default 50
+         */
+        maxResultsPerRequest: 50,
+
+        /**
+         * The cut-off point determining when the page's responsive layout rearranges elements.
+         *
+         * If the browser's width is smaller than this, elements will be rearranged.
+         *
+         * This can normally be left at the default, but if you know that, e.g., the
+         * `<google-youtube-video-wall>` is only taking up 50% of the browser's width, you might
+         * want to adjust this value to trigger rearrangement at 1200px.
+         *
+         * @attribute narrowWidth
+         * @type string
+         * @default '600px'
+         */
+        narrowWidth: '600px',
+
+        /**
+         * The order in which search results are returned.
+         *
+         * This corresponds to the [`order`](https://developers.google.com/youtube/v3/docs/search/list#order)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute location
+         * @type string
+         * @default 'relevance'
+         */
+        order: 'relevance',
+
+        /**
+         * An optional search filter which limits the results to videos that were published after a certain date.
+         *
+         * If set, you must use an [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt)
+         * formatted date-time value (e.g. `'1970-01-01T00:00:00Z'`).
+         *
+         * This corresponds to the [`publishedAfter`](https://developers.google.com/youtube/v3/docs/search/list#publishedAfter)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute publishedAfter
+         * @type string
+         * @default ''
+         */
+        publishedAfter: '',
+
+        /**
+         * An optional search filter which limits the results to videos that were published before a certain date.
+         *
+         * If set, you must use an [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt)
+         * formatted date-time value (e.g. `'1970-01-01T00:00:00Z'`).
+         *
+         * This corresponds to the [`publishedBefore`](https://developers.google.com/youtube/v3/docs/search/list#publishedBefore)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute publishedBefore
+         * @type string
+         * @default ''
+         */
+        publishedBefore: '',
+
+        /**
+         * An optional search filter which limits the results to videos that match the specified string.
+         *
+         * This corresponds to the [`q`](https://developers.google.com/youtube/v3/docs/search/list#q)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute q
+         * @type string
+         * @default ''
+         */
+        q: '',
+
+        /**
+         * An optional search filter which determines whether restricted content is returned in the results.
+         *
+         * This corresponds to the [`safeSearch`](https://developers.google.com/youtube/v3/docs/search/list#safeSearch)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute q
+         * @type string
+         * @default 'moderate'
+         */
+        safeSearch: 'moderate',
+
+        /**
+         * Whether or not to allow users to enter their own search terms to narrow down results.
+         *
+         * @attribute showSearch
+         * @type boolean
+         * @default false
+         */
+        showSearch: false,
+
+        /**
+         * An optional search filter which limits the results to videos that match the specified topic id.
+         *
+         * Topic ids traditionally begin with the prefix `/m/`.
+         * You can use the [Freebase API](https://developers.google.com/freebase/index) to look up the id for a specific topic.
+         *
+         * This corresponds to the [`topicId`](https://developers.google.com/youtube/v3/docs/search/list#topicId)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute topicId
+         * @type string
+         * @default ''
+         */
+        topicId: '',
+
+        /**
+         * The cut-off point determining when the page's responsive layout rearranges elements.
+         *
+         * If the browser's width is smaller than this, elements will be rearranged.
+         *
+         * This can normally be left at the default, but if you know that, e.g., the
+         * `<google-youtube-video-wall>` is only taking up 50% of the browser's width, you might
+         * want to adjust this value to trigger rearrangement at 900px.
+         *
+         * @attribute narrowWidth
+         * @type string
+         * @default '450px'
+         */
+        veryNarrowWidth: '450px',
+
+        /**
+         * An optional search filter which limits the results to videos that fall into a specific YouTube category.
+         *
+         * You can obtain a list of video category ids from the [API Explorer](https://developers.google.com/apis-explorer/#p/youtube/v3/youtube.videoCategories.list?part=snippet&regionCode=us).
+         * The change very infrequently, and it is generally safe to hardcode a video category id once you look it up.
+         *
+         * @attribute videoCategoryId
+         * @type string
+         * @default ''
+         */
+        videoCategoryId: '',
+
+        /**
+         * Title displayed in the video wall header.
+         *
+         * @attribute wallTitle
+         * @type string
+         * @default 'YouTube Videos'
+         */
+        wallTitle: 'YouTube Videos',
+
+        // Placeholder, since the YT Player doesn't like being initialized without a video id.
+        _selectedVideoId: 'mN7IAaRdi_k',
+        _selectedVideoTitle: '',
+        _nextPageToken: '',
+        _youtubeApiSearchParams: '',
+        _videos: null,
+        _apiError: '',
+
+        updateYouTubeApiSearchParams: function() {
+          var params = {
+            part: 'snippet',
+            pageToken: this._nextPageToken,
+            type: 'video',
+            videoEmbeddable: 'true',
+            key: this.apiKey,
+            maxResults: this.maxResultsPerRequest,
+            channelId: this.channelId,
+            location: this.location,
+            locationRadius: this.locationRadius,
+            order: this.order,
+            q: this.q,
+            safeSearch: this.safeSearch,
+            topicId: this.topicId,
+            videoCategoryId: this.videoCategoryId
+          };
+
+          Object.keys(params).forEach(function(key) {
+            if (params[key] === '') {
+              delete(params[key]);
+            }
+          });
+
+          this._youtubeApiSearchParams = JSON.stringify(params);
+        },
+
+        handleSearchResponse: function(e) {
+          this._apiError = '';
+          var response = e.detail.response;
+
+          // If there are already some results and this is the next page of results, concatenate.
+          if (this._videos && this._nextPageToken) {
+            for (var i = 0; i < response.items.length; i++) {
+              this._videos.push(response.items[i]);
+            }
+          } else {
+            this._videos = response.items;
+          }
+
+          if (response.nextPageToken && this._videos.length < this.maxVideos) {
+            this._nextPageToken = response.nextPageToken;
+            this.async(this.updateYouTubeApiSearchParams);
+          } else if (this._videos.length > this.maxVideos) {
+            // If we have more results that we require, truncate the array by setting its length.
+            this._videos.length = this.maxVideos;
+          }
+        },
+
+        handleSearchError: function(e) {
+          if (e.detail.response.indexOf('keyInvalid') >= 0) {
+            this._apiError = 'Missing or invalid API key. Please see the <google-youtube-video-wall> ' +
+              'documentation for information on setting the "apiKey" property to a valid value.'
+          } else {
+            this._apiError = e.detail.response;
+          }
+        },
+
+        handleItemSelected: function(e) {
+          this._selectedVideoTitle = e.srcElement.parentNode.dataset.videoTitle;
+          this._selectedVideoId = e.srcElement.parentNode.dataset.videoId;
+          this.$.corepage.selected = 1;
+        },
+
+        handlePlayerClose: function() {
+          this.shadowRoot.querySelector('#youtubeplayer').pause();
+          this.$.corepage.selected = 0;
+
+          this.state = -1;
+          this.currentTime = 0;
+          this.fractionLoaded = 0;
+        },
+
+        handlePlay: function() {
+          this.shadowRoot.querySelector('#youtubeplayer').play();
+        },
+
+        handlePause: function() {
+          this.shadowRoot.querySelector('#youtubeplayer').pause();
+        },
+
+        handleSeekTo: function(e) {
+          this.shadowRoot.querySelector('#youtubeplayer').seekTo(this.$.seekbar.immediateValue);
+        },
+
+        handleTransitionEnd: function() {
+          // If we've transitioned from the player to the results page, reset _selectedVideoId
+          // so that the next <google-youtube> player element is "fresh".
+          // We can't reset it prior to the transition since it will mess up the hero-id mapping.
+          if (this.$.corepage.selected == 0) {
+            this._selectedVideoId = '';
+          }
+        },
+
+        observe: {
+          'apiKey channelId location locationRadius maxResults order publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
+            this._nextPageToken = '';
+            this.updateYouTubeApiSearchParams();
+          }
+        },
+
+        ready: function() {
+          this.updateYouTubeApiSearchParams();
+        }
+      });
+  </script>
+</polymer-element>

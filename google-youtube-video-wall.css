@@ -1,0 +1,126 @@
+:host {
+  display: block;
+  position: relative;
+  font-family: RobotoDraft, Helvetica, Arial, sans-serif;
+  background: #e5e5e5;
+}
+
+#youtubeplayer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  bottom: 64px;
+}
+
+#playerpage.narrow #youtubeplayer {
+  bottom: 128px;
+}
+
+core-toolbar {
+  color: #ffffff;
+  background-color: #ad1457;
+}
+
+paper-ripple {
+  color: #ff7997;
+}
+
+paper-input /deep/ input {
+  color: #ffffff;
+}
+
+#searchresults {
+  padding: 8px 8px 8px 12px;
+  text-align: center;
+}
+
+.video-container {
+  cursor: pointer;
+  display: inline-block;
+  width: 320px;
+  height: 320px;
+  background-color: #ffffff;
+  vertical-align: top;
+  margin: 8px 8px 8px 0;
+  border-radius: 2px;
+}
+
+.video-container > img {
+  width: 100%;
+  display: block;
+  overflow: hidden;
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+}
+
+.text-container {
+  height: 124px;
+  overflow-y: hidden;
+}
+
+.text-container > h1 {
+  text-align: left;
+  font-size: 16px;
+  margin: 16px 16px 0 16px;
+}
+
+.text-container > p {
+  text-align: left;
+  font-size: 12px;
+  margin: 8px 16px 16px 16px;
+}
+
+paper-slider {
+  position: absolute;
+  width: 100%;
+  bottom: 47px;
+  left: 0;
+  z-index: 1;
+}
+
+#playerpage.narrow paper-slider {
+  bottom: 111px;
+}
+
+paper-fab {
+  color: #056f00;
+  background-color: #a2f78d;
+}
+
+#close-button {
+  color: #000000;
+  background: #e5e5e5;
+  position: relative;
+  top: 16px;
+  left: 16px;
+  opacity: 0.5;
+  z-index: 1;
+}
+
+paper-slider::shadow #sliderBar::shadow #activeProgress {
+  background-color: #827717;
+}
+
+paper-slider::shadow #sliderKnobInner {
+  background-color: #a2f78d;
+}
+
+paper-slider::shadow #sliderBar::shadow #secondaryProgress {
+  background-color: #afb42b;
+}
+
+#playercontrols {
+  position: absolute;
+  right: 0;
+  left: 0;
+  bottom: 0;
+}
+
+#searchresults.veryNarrow {
+  padding-right: 12px;
+}
+
+#searchresults.veryNarrow > .video-container {
+  width: 100%;
+}

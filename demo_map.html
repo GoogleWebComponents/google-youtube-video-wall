@@ -1,0 +1,81 @@
+<!doctype html>
+<!--
+Copyright 2014 Google Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+    <title>&lt;google-maps&gt; + &lt;google-youtube-video-wall&gt; Demo</title>
+
+    <script src="../platform/platform.js"></script>
+    <link rel="import" href="google-youtube-video-wall.html">
+    <link rel="import" href="../google-map/google-map.html">
+    <link rel="import" href="../geo-location/geo-location.html">
+
+    <style>
+      google-map {
+        display: block;
+        width: 100%;
+        min-height: 200px;
+        height: 25%;
+      }
+
+      google-youtube-video-wall {
+        display: block;
+        width: 100%;
+        height: 75%;
+      }
+    </style>
+  </head>
+
+  <body unresolved>
+    <template is="auto-binding">
+      <geo-location latitude="{{latitude}}"
+                    longitude="{{longitude}}">
+      </geo-location>
+
+      <template if="{{latitude == null || longitude == null}}">
+        <h1>
+          <code>&lt;google-maps&gt;</code> + <code>&lt;google-youtube-video-wall&gt;</code>
+        </h1>
+
+        <p>Determining location...</p>
+      </template>
+
+      <template if="{{latitude != null && longitude != null}}">
+        <div vertical layout fit>
+          <google-map latitude="{{latitude}}"
+                      longitude="{{longitude}}">
+            <google-map-marker latitude="{{latitude}}"
+                               longitude="{{longitude}}"
+                               draggable="true">
+            </google-map-marker>
+          </google-map>
+
+          <!-- Please register for your own key! https://developers.google.com/youtube/registering_an_application -->
+          <google-youtube-video-wall apiKey="AIzaSyAcB7qNYPC6bI7e3PHscV8w5-acmocWhmE"
+                                     wallTitle="Real Estate Finder"
+                                     location="{{latitude}},{{longitude}}"
+                                     locationRadius="2mi"
+                                     order="date"
+                                     q="real estate"
+                                     flex>
+          </google-youtube-video-wall>
+        </div>
+      </template>
+    </template>
+  </body>
+</html>
