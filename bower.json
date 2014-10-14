@@ -11,7 +11,7 @@
     "web-components"
   ],
   "license": "Apache-2.0",
-  "homepage": "http://googlewebcomponents.github.io/google-youtube-video-wall/demo.html",
+  "homepage": "http://googlewebcomponents.github.io/google-youtube-video-wall/components/google-youtube-video-wall/",
   "ignore": [
     "**/.*",
     "node_modules",
@@ -22,12 +22,12 @@
   ],
   "dependencies": {
     "core-elements": "Polymer/core-elements#^0.4.2",
+    "geo-location": "ebidel/geo-location#~0.0.5",
+    "google-map": "GoogleWebComponents/google-map#~0.3.1",
     "google-youtube": "GoogleWebComponents/google-youtube#~0.0.8",
     "paper-elements": "Polymer/paper-elements#^0.4.2"
   },
   "devDependencies": {
-    "geo-location": "ebidel/geo-location#~0.0.5",
-    "google-map": "GoogleWebComponents/google-map#~0.3.1",
     "web-component-tester": "Polymer/web-component-tester#^1.1.1"
   }
 }
