@@ -47,6 +47,7 @@ paper-input /deep/ input {
 }
 
 .video-container > img {
+  position: relative;
   width: 100%;
   display: block;
   overflow: hidden;
