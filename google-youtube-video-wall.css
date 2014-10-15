@@ -46,6 +46,10 @@ paper-input /deep/ input {
   border-radius: 2px;
 }
 
+.video-container > paper-ripple {
+  z-index: 1;
+}
+
 .video-container > img {
   position: relative;
   width: 100%;
