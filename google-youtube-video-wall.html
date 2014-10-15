@@ -503,8 +503,8 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         },
 
         handleItemSelected: function(e) {
-          this._selectedVideoTitle = e.srcElement.parentNode.dataset.videoTitle;
-          this._selectedVideoId = e.srcElement.parentNode.dataset.videoId;
+          this._selectedVideoTitle = e.target.parentNode.dataset.videoTitle;
+          this._selectedVideoId = e.target.parentNode.dataset.videoId;
           this.$.corepage.selected = 1;
         },
 
