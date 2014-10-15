@@ -481,6 +481,10 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 
           if (response.nextPageToken && this._videos.length < this.maxVideos) {
             this._nextPageToken = response.nextPageToken;
+
+            if (this.$.resultspage.scroller.clientHeight == this.$.resultspage.scroller.scrollHeight) {
+              this.async(this.updateYouTubeApiParams);
+            }
           } else if (this._videos.length > this.maxVideos) {
             // If we have more results that we require, truncate the array by setting its length.
             this._videos.length = this.maxVideos;
