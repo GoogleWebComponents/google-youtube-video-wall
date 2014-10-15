@@ -39,7 +39,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 -->
 
 <polymer-element name="google-youtube-video-wall"
-                 attributes="apiKey channelId location locationRadius maxResults maxVideos narrowWidth order publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
+                 attributes="apiKey channelId location locationRadius maxResults maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
   <template>
     <link rel="stylesheet" href="google-youtube-video-wall.css">
 
@@ -77,9 +77,9 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 
             <template repeat="{{video in _videos}}">
               <div class="video-container"
-                       data-video-id="{{video.id.videoId}}"
-                       data-video-title="{{video.snippet.title}}"
-                       on-tap="{{handleItemSelected}}">
+                   data-video-id="{{video.id.videoId || video.snippet.resourceId.videoId}}"
+                   data-video-title="{{video.snippet.title}}"
+                   on-tap="{{handleItemSelected}}">
                 <paper-shadow z="1"></paper-shadow>
                 <paper-ripple fit></paper-ripple>
 
@@ -152,15 +152,23 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
       </section>
     </core-animated-pages>
 
-    <template if="{{_youtubeApiSearchParams}}">
+    <template if="{{_youtubeApiParams && _youtubeApiService}}">
       <core-ajax auto
-                 url="https://www.googleapis.com/youtube/v3/search"
-                 params="{{_youtubeApiSearchParams}}"
+                 url="https://www.googleapis.com/youtube/v3/{{_youtubeApiService}}"
+                 params="{{_youtubeApiParams}}"
                  handleAs="json"
-                 on-core-response="{{handleSearchResponse}}"
-                 on-core-error="{{handleSearchError}}">
+                 on-core-response="{{handleYouTubeApiResponse}}"
+                 on-core-error="{{handleYouTubeApiError}}">
       </core-ajax>
     </template>
+
+    <core-ajax id="titleajax"
+               url="https://www.googleapis.com/youtube/v3/playlists"
+               params='{"part": "snippet", "id": "{{playlistId}}", "key": "{{apiKey}}"}'
+               handleAs="json"
+               on-core-response="{{handlePlaylistTitleResponse}}"
+               on-core-error="{{handleYouTubeApiError}}">
+    </core-ajax>
   </template>
 
   <script>
@@ -275,6 +283,20 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         order: 'relevance',
 
         /**
+         * If `playlistId` is specified, then the video wall will be populated with the contents of that YouTube playlist.
+         *
+         * Any search-related attributes will be ignored as long this attribute is set.
+         *
+         * `this.showSearch` will be set to `false`, since it's not possible to filter the contents of a playlist based
+         * on a search term using the YouTube Data API v3.
+         *
+         * @attribute playlistId
+         * @type string
+         * @default ''
+         */
+        playlistId: '',
+
+        /**
          * An optional search filter which limits the results to videos that were published after a certain date.
          *
          * If set, you must use an [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt)
@@ -384,35 +406,52 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
          *
          * @attribute wallTitle
          * @type string
-         * @default 'YouTube Videos'
+         * @default ''
          */
-        wallTitle: 'YouTube Videos',
+        wallTitle: '',
 
         // Placeholder, since the YT Player doesn't like being initialized without a video id.
         _selectedVideoId: 'mN7IAaRdi_k',
         _selectedVideoTitle: '',
         _nextPageToken: '',
-        _youtubeApiSearchParams: '',
+        // This will be set to either 'search' or 'playlistItems', depending on the other attributes.
+        _youtubeApiService: '',
+        _youtubeApiParams: '',
         _videos: null,
         _apiError: '',
 
-        updateYouTubeApiSearchParams: function() {
-          var params = {
-            part: 'snippet',
-            pageToken: this._nextPageToken,
-            type: 'video',
-            videoEmbeddable: 'true',
-            key: this.apiKey,
-            maxResults: this.maxResultsPerRequest,
-            channelId: this.channelId,
-            location: this.location,
-            locationRadius: this.locationRadius,
-            order: this.order,
-            q: this.q,
-            safeSearch: this.safeSearch,
-            topicId: this.topicId,
-            videoCategoryId: this.videoCategoryId
-          };
+        updateYouTubeApiParams: function() {
+          var params;
+
+          if (this.playlistId) {
+            this.showSearch = false;
+            this._youtubeApiService = 'playlistItems';
+            params = {
+              key: this.apiKey,
+              part: 'snippet',
+              pageToken: this._nextPageToken,
+              playlistId: this.playlistId,
+              maxResults: this.maxResultsPerRequest
+            };
+          } else {
+            this._youtubeApiService = 'search';
+            params = {
+              key: this.apiKey,
+              part: 'snippet',
+              pageToken: this._nextPageToken,
+              type: 'video',
+              videoEmbeddable: 'true',
+              maxResults: this.maxResultsPerRequest,
+              channelId: this.channelId,
+              location: this.location,
+              locationRadius: this.locationRadius,
+              order: this.order,
+              q: this.q,
+              safeSearch: this.safeSearch,
+              topicId: this.topicId,
+              videoCategoryId: this.videoCategoryId
+            };
+          }
 
           Object.keys(params).forEach(function(key) {
             if (params[key] === '') {
@@ -420,10 +459,10 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
             }
           });
 
-          this._youtubeApiSearchParams = JSON.stringify(params);
+          this._youtubeApiParams = JSON.stringify(params);
         },
 
-        handleSearchResponse: function(e) {
+        handleYouTubeApiResponse: function(e) {
           this._apiError = '';
           var response = e.detail.response;
 
@@ -438,14 +477,23 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 
           if (response.nextPageToken && this._videos.length < this.maxVideos) {
             this._nextPageToken = response.nextPageToken;
-            this.async(this.updateYouTubeApiSearchParams);
+            this.async(this.updateYouTubeApiParams);
           } else if (this._videos.length > this.maxVideos) {
             // If we have more results that we require, truncate the array by setting its length.
             this._videos.length = this.maxVideos;
           }
         },
 
-        handleSearchError: function(e) {
+        handlePlaylistTitleResponse: function(e) {
+          this._apiError = '';
+          var response = e.detail.response;
+
+          if (response.items) {
+            this.wallTitle = response.items[0].snippet.title;
+          }
+        },
+
+        handleYouTubeApiError: function(e) {
           if (e.detail.response.indexOf('keyInvalid') >= 0) {
             this._apiError = 'Missing or invalid API key. Please see the <google-youtube-video-wall> ' +
               'documentation for information on setting the "apiKey" property to a valid value.'
@@ -493,12 +541,25 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         observe: {
           'apiKey channelId location locationRadius maxResults order publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
             this._nextPageToken = '';
-            this.updateYouTubeApiSearchParams();
+            this.updateYouTubeApiParams();
+          }
+        },
+
+        playlistIdChanged: function() {
+          // Check to make sure that playlistId isn't being reset to something false...
+          if (this.playlistId) {
+            // Only overwrite this.wallTitle if it's not being explicitly set by the element.
+            if(!this.hasAttribute('wallTitle')) {
+              this.$.titleajax.go();
+            }
+
+            this._nextPageToken = '';
+            this.updateYouTubeApiParams();
           }
         },
 
         ready: function() {
-          this.updateYouTubeApiSearchParams();
+          this.updateYouTubeApiParams();
         }
       });
   </script>
