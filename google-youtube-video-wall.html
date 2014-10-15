@@ -162,16 +162,13 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
       </core-ajax>
     </template>
 
-    <!-- Get the wall's title from the playlist's title if we're using a playlist id. -->
-    <template if="{{playlistId && wallTitle === ''}}">
-      <core-ajax auto
-                 url="https://www.googleapis.com/youtube/v3/playlists"
-                 params='{"part": "snippet", "id": "{{playlistId}}", "key": "{{apiKey}}"}'
-                 handleAs="json"
-                 on-core-response="{{handlePlaylistListResponse}}"
-                 on-core-error="{{handleYouTubeApiError}}">
-      </core-ajax>
-    </template>
+    <core-ajax id="titleajax"
+               url="https://www.googleapis.com/youtube/v3/playlists"
+               params='{"part": "snippet", "id": "{{playlistId}}", "key": "{{apiKey}}"}'
+               handleAs="json"
+               on-core-response="{{handlePlaylistTitleResponse}}"
+               on-core-error="{{handleYouTubeApiError}}">
+    </core-ajax>
   </template>
 
   <script>
@@ -487,7 +484,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
           }
         },
 
-        handlePlaylistListResponse: function(e) {
+        handlePlaylistTitleResponse: function(e) {
           this._apiError = '';
           var response = e.detail.response;
 
@@ -542,7 +539,20 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         },
 
         observe: {
-          'apiKey channelId location locationRadius maxResults order playlistId publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
+          'apiKey channelId location locationRadius maxResults order publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
+            this._nextPageToken = '';
+            this.updateYouTubeApiParams();
+          }
+        },
+
+        playlistIdChanged: function() {
+          // Check to make sure that playlistId isn't being reset to something false...
+          if (this.playlistId) {
+            // Only overwrite this.wallTitle if it's not being explicitly set by the element.
+            if(!this.hasAttribute('wallTitle')) {
+              this.$.titleajax.go();
+            }
+
             this._nextPageToken = '';
             this.updateYouTubeApiParams();
           }
