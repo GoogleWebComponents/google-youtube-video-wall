@@ -13,6 +13,10 @@
   bottom: 64px;
 }
 
+#youtubeplayer /deep/ iframe {
+  position: absolute;
+}
+
 #playerpage.narrow #youtubeplayer {
   bottom: 128px;
 }
