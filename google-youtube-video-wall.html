@@ -14,7 +14,6 @@
 <link rel="import" href="../paper-input/paper-input.html">
 <link rel="import" href="../paper-slider/paper-slider.html">
 <link rel="import" href="../paper-ripple/paper-ripple.html">
-<link rel="import" href="../paper-shadow/paper-shadow.html">
 <link rel="import" href="../polymer/polymer.html">
 
 
@@ -39,7 +38,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 -->
 
 <polymer-element name="google-youtube-video-wall"
-                 attributes="apiKey channelId location locationRadius maxResults maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
+                 attributes="apiKey channelId location locationRadius maxResultsPerRequest maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
   <template>
     <link rel="stylesheet" href="google-youtube-video-wall.css">
 
@@ -52,7 +51,10 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
                          selected="0"
                          on-core-animated-pages-transition-end="{{handleTransitionEnd}}">
       <section>
-        <core-header-panel id="resultspage" fit cross-fade>
+        <core-header-panel id="resultspage"
+                           fit
+                           cross-fade
+                           on-scroll="{{handleResultsScroll}}">
           <core-toolbar class="{{ {'medium-tall': narrow && showSearch} | tokenList }}">
             <header flex>{{wallTitle}}</header>
 
@@ -65,7 +67,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
             </template>
           </core-toolbar>
 
-          <div id="searchresults" class="{{ {veryNarrow: veryNarrow} | tokenList }}">
+          <div id="searchresults" class="{{ {veryNarrow: veryNarrow} | tokenList }}" hero-p>
             <template if="{{_apiError}}">
               <h1>Oops! The following error occurred:</h1>
               <pre>{{_apiError}}</pre>
@@ -79,13 +81,12 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               <div class="video-container"
                    data-video-id="{{video.id.videoId || video.snippet.resourceId.videoId}}"
                    data-video-title="{{video.snippet.title}}"
-                   on-tap="{{handleItemSelected}}">
-                <paper-shadow z="1"></paper-shadow>
+                   on-click="{{handleItemSelected}}">
                 <paper-ripple fit></paper-ripple>
 
                 <img src="{{video.snippet.thumbnails.medium.url}}"
                      hero-id="{{video.id.videoId}}"
-                     hero>
+                     hero?="{{video.id.videoId === _selectedVideoId}}">
                 <div class="text-container">
                   <h1>{{video.snippet.title}}</h1>
                   <p>{{video.snippet.description}}</p>
@@ -101,6 +102,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
           <template if="{{_selectedVideoId}}">
             <paper-icon-button id="close-button"
                                icon="close"
+                               fill
                                on-tap="{{handlePlayerClose}}">
             </paper-icon-button>
 
@@ -477,7 +479,10 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 
           if (response.nextPageToken && this._videos.length < this.maxVideos) {
             this._nextPageToken = response.nextPageToken;
-            this.async(this.updateYouTubeApiParams);
+
+            if (this.$.resultspage.scroller.clientHeight == this.$.resultspage.scroller.scrollHeight) {
+              this.async(this.updateYouTubeApiParams);
+            }
           } else if (this._videos.length > this.maxVideos) {
             // If we have more results that we require, truncate the array by setting its length.
             this._videos.length = this.maxVideos;
@@ -503,18 +508,24 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         },
 
         handleItemSelected: function(e) {
-          this._selectedVideoTitle = e.srcElement.parentNode.dataset.videoTitle;
-          this._selectedVideoId = e.srcElement.parentNode.dataset.videoId;
-          this.$.corepage.selected = 1;
+          // Wait before starting the transition to the play page to give the paper-ripple effect time to animate.
+          this.async(function(args) {
+            this._selectedVideoTitle = args.title;
+            this._selectedVideoId = args.videoId;
+            this.$.corepage.selected = 1;
+          }, { title: e.target.parentNode.dataset.videoTitle, videoId: e.target.parentNode.dataset.videoId }, 150);
         },
 
         handlePlayerClose: function() {
-          this.shadowRoot.querySelector('#youtubeplayer').pause();
-          this.$.corepage.selected = 0;
+          // Wait before starting the transition to the results page to give the paper-ripple effect time to animate.
+          this.async(function() {
+            this.shadowRoot.querySelector('#youtubeplayer').pause();
+            this.$.corepage.selected = 0;
 
-          this.state = -1;
-          this.currentTime = 0;
-          this.fractionLoaded = 0;
+            this.state = -1;
+            this.currentTime = 0;
+            this.fractionLoaded = 0;
+          }, null, 75);
         },
 
         handlePlay: function() {
@@ -535,6 +546,14 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
           // We can't reset it prior to the transition since it will mess up the hero-id mapping.
           if (this.$.corepage.selected == 0) {
             this._selectedVideoId = '';
+          }
+        },
+
+        handleResultsScroll: function(e) {
+          // 320 is the height of the video container, so this check is roughly equivalent to
+          // "is the bottom of the scroll area on the second-to-last row?"
+          if ((e.detail.target.scrollTop + e.detail.target.clientHeight + 320) >= e.detail.target.scrollHeight) {
+            this.async(this.updateYouTubeApiParams);
           }
         },
 
