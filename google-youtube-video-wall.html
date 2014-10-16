@@ -14,7 +14,6 @@
 <link rel="import" href="../paper-input/paper-input.html">
 <link rel="import" href="../paper-slider/paper-slider.html">
 <link rel="import" href="../paper-ripple/paper-ripple.html">
-<link rel="import" href="../paper-shadow/paper-shadow.html">
 <link rel="import" href="../polymer/polymer.html">
 
 
@@ -83,7 +82,6 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
                    data-video-id="{{video.id.videoId || video.snippet.resourceId.videoId}}"
                    data-video-title="{{video.snippet.title}}"
                    on-click="{{handleItemSelected}}">
-                <paper-shadow z="1"></paper-shadow>
                 <paper-ripple fit></paper-ripple>
 
                 <img src="{{video.snippet.thumbnails.medium.url}}"

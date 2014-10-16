@@ -37,6 +37,7 @@ paper-input /deep/ input {
 
 .video-container {
   cursor: pointer;
+  position: relative;
   display: inline-block;
   width: 320px;
   height: 320px;
@@ -44,6 +45,7 @@ paper-input /deep/ input {
   vertical-align: top;
   margin: 8px 8px 8px 0;
   border-radius: 2px;
+  box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.26);
 }
 
 .video-container > paper-ripple {
