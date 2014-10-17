@@ -133,14 +133,16 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 
           <core-toolbar id="playercontrols" class="{{ {'medium-tall': narrow} | tokenList }}">
             <template if="{{state == 1 || state == 3}}">
-              <paper-fab class="{{ {bottom: narrow, mini: true} | tokenList }}"
+              <paper-fab class="{{ {bottom: narrow} | tokenList }}"
+                         mini
                          icon="av:pause"
                          on-tap="{{handlePause}}">
               </paper-fab>
             </template>
 
             <template if="{{state != 1 && state != 3}}">
-              <paper-fab class="{{ {bottom: narrow, mini: true} | tokenList }}"
+              <paper-fab class="{{ {bottom: narrow} | tokenList }}"
+                         mini
                          icon="av:play-arrow"
                          on-tap="{{handlePlay}}">
               </paper-fab>
@@ -474,6 +476,9 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               this._videos.push(response.items[i]);
             }
           } else {
+            // Scroll to the top so that the first row of new results are visible.
+            this.$.resultspage.scroller.scrollTop = 0;
+
             this._videos = response.items;
           }
 
