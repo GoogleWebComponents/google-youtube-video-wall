@@ -142,5 +142,5 @@ paper-slider::shadow #sliderBar::shadow #secondaryProgress {
 }
 
 #searchresults.veryNarrow > .video-container {
-  width: 100%;
+  max-width: 100%;
 }
