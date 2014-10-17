@@ -34,6 +34,10 @@ paper-input /deep/ input {
   color: #ffffff;
 }
 
+paper-input /deep/ #focusedUnderline {
+  background-color: #a2f78d;
+}
+
 #searchresults {
   padding: 8px 8px 8px 12px;
   text-align: center;
