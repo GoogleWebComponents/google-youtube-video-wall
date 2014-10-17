@@ -148,7 +148,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               </paper-fab>
             </template>
 
-            <p flex>{{_selectedVideoTitle}}</p>
+            <p flex class="video-title">{{_selectedVideoTitle}}</p>
 
             <p class="{{ {bottom: narrow} | tokenList }}" hidden?="{{duration == 0}}">{{currentTimeFormatted}}/{{durationFormatted}}</p>
           </core-toolbar>

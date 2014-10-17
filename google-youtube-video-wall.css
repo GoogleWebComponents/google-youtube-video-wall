@@ -86,6 +86,11 @@ paper-input /deep/ #focusedUnderline {
   margin: 8px 16px 16px 16px;
 }
 
+.video-title {
+  max-height: 48px;
+  overflow-y: hidden;
+}
+
 paper-slider {
   position: absolute;
   width: 100%;
