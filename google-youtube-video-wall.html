@@ -108,6 +108,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 
             <google-youtube id="youtubeplayer"
                             videoid="{{_selectedVideoId}}"
+                            playsupported="{{playSupported}}"
                             chromeless
                             width="100%"
                             height="100%"
@@ -140,7 +141,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               </paper-fab>
             </template>
 
-            <template if="{{state != 1 && state != 3}}">
+            <template if="{{state != 1 && state != 3 && playSupported}}">
               <paper-fab class="{{ {bottom: narrow} | tokenList }}"
                          mini
                          icon="av:play-arrow"
@@ -526,9 +527,9 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
           this.async(function() {
             this.shadowRoot.querySelector('#youtubeplayer').pause();
             this.$.corepage.selected = 0;
+            this.playSupported = null;
 
             this.state = -1;
-            this.currentTime = 0;
             this.fractionLoaded = 0;
           }, null, 75);
         },
