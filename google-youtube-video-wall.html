@@ -56,7 +56,10 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
                            cross-fade
                            on-scroll="{{handleResultsScroll}}">
           <core-toolbar class="{{ {'medium-tall': narrow && showSearch} | tokenList }}">
-            <header flex>{{wallTitle}}</header>
+            <header flex>
+              <content></content>
+              {{wallTitle}}
+            </header>
 
             <template if="{{showSearch}}">
               <core-icon icon="search" class="{{ {bottom: narrow} | tokenList }}"></core-icon>
