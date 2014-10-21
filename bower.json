@@ -1,6 +1,6 @@
 {
   "name": "google-youtube-video-wall",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "YouTube Video Wall demo. Powered by the google-youtube Polymer component.",
   "main": "google-youtube-video-wall.html",
   "keywords": [

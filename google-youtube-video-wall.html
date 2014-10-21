@@ -38,7 +38,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 -->
 
 <polymer-element name="google-youtube-video-wall"
-                 attributes="apiKey channelId location locationRadius maxResultsPerRequest maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
+                 attributes="apiKey channelId eventType location locationRadius maxResultsPerRequest maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
   <template>
     <link rel="stylesheet" href="google-youtube-video-wall.css">
 
@@ -84,6 +84,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               <div class="video-container"
                    data-video-id="{{video.id.videoId || video.snippet.resourceId.videoId}}"
                    data-video-title="{{video.snippet.title}}"
+                   data-is-live="{{video.snippet.liveBroadcastContent === 'live'}}"
                    on-click="{{handleItemSelected}}">
                 <paper-ripple fit></paper-ripple>
 
@@ -154,7 +155,15 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 
             <p flex class="video-title">{{_selectedVideoTitle}}</p>
 
-            <p class="{{ {bottom: narrow} | tokenList }}" hidden?="{{duration == 0}}">{{currentTimeFormatted}}/{{durationFormatted}}</p>
+            <p class="{{ {bottom: narrow} | tokenList }}">
+              <template if="{{duration != 0 && !_selectedVideoIsLive}}">
+                {{currentTimeFormatted}}/{{durationFormatted}}
+              </template>
+
+              <template if="{{_selectedVideoIsLive}}">
+                Live Broadcast
+              </template>
+            </p>
           </core-toolbar>
         </div>
       </section>
@@ -212,6 +221,20 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
          * @default ''
          */
         channelId: '',
+
+        /**
+         * An optional search filter which limits the results to videos that are/were livestreamed.
+         *
+         * Acceptable values are `completed`, `live`, or `upcoming`.
+         *
+         * This corresponds to the [`eventType`](https://developers.google.com/youtube/v3/docs/search/list#eventType)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute eventType
+         * @type string
+         * @default ''
+         */
+        eventType: '',
 
         /**
          * An optional search filter which limits the results to geotagged videos that are close to a specific location.
@@ -421,6 +444,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         // Placeholder, since the YT Player doesn't like being initialized without a video id.
         _selectedVideoId: 'mN7IAaRdi_k',
         _selectedVideoTitle: '',
+        _selectedVideoIsLive: false,
         _nextPageToken: '',
         // This will be set to either 'search' or 'playlistItems', depending on the other attributes.
         _youtubeApiService: '',
@@ -451,6 +475,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               videoEmbeddable: 'true',
               maxResults: this.maxResultsPerRequest,
               channelId: this.channelId,
+              eventType: this.eventType,
               location: this.location,
               locationRadius: this.locationRadius,
               order: this.order,
@@ -521,8 +546,13 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
           this.async(function(args) {
             this._selectedVideoTitle = args.title;
             this._selectedVideoId = args.videoId;
+            this._selectedVideoIsLive = args.isLive === 'true';
             this.$.corepage.selected = 1;
-          }, { title: e.target.parentNode.dataset.videoTitle, videoId: e.target.parentNode.dataset.videoId }, 150);
+          }, {
+            title: e.target.parentNode.dataset.videoTitle,
+            videoId: e.target.parentNode.dataset.videoId,
+            isLive: e.target.parentNode.dataset.isLive
+          }, 150);
         },
 
         handlePlayerClose: function() {

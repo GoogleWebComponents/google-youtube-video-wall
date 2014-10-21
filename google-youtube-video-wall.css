@@ -63,6 +63,7 @@ paper-input /deep/ #focusedUnderline {
 .video-container > img {
   position: relative;
   width: 100%;
+  max-height: 180px;
   display: block;
   overflow: hidden;
   border-top-left-radius: 2px;
