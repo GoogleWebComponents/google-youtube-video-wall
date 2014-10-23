@@ -38,7 +38,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 -->
 
 <polymer-element name="google-youtube-video-wall"
-                 attributes="apiKey channelId eventType location locationRadius maxResultsPerRequest maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
+                 attributes="apiKey channelId eventType goingBackDays location locationRadius maxResultsPerRequest maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
   <template>
     <link rel="stylesheet" href="google-youtube-video-wall.css">
 
@@ -235,6 +235,23 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
          * @default ''
          */
         eventType: '',
+
+        /**
+         * An optional filter that limits search results to videos published within the past `goingBackDays` number of days.
+         *
+         * This will dynamically set `this.publishedAfter` to a date roughly equal to `Date.now()` -  `goingBackDays` days.
+         * If set, it takes precedence over any value also set for the `this.publishedAfter` attribute.
+         *
+         * E.g.:
+         * - To only include videos published within the past 24 hours, set `goingBackDays` to `1`.
+         * - To only include videos published within the past 12 hours, set `goingBackDays` to `0.5`.
+         * - To only include videos published within the past week, set `goingBackDays` to `7`.
+         *
+         * @attribute goingBackDays
+         * @type number
+         * @default null
+         */
+        goingBackDays: null,
 
         /**
          * An optional search filter which limits the results to geotagged videos that are close to a specific location.
@@ -466,6 +483,16 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               maxResults: this.maxResultsPerRequest
             };
           } else {
+            var calculatedPublishedAfter;
+            if (this.goingBackDays !== null) {
+              // this._now is set once within ready().
+              // If we instead used a dynamic Date.now() value when setting calculatedPublishedAfter,
+              // it would come up with a slightly different date string each time,
+              // which would trigger a new search.
+              var then = this._now - (this.goingBackDays * 24 * 60 * 60 * 1000);
+              calculatedPublishedAfter = new Date(then).toISOString();
+            }
+
             this._youtubeApiService = 'search';
             params = {
               key: this.apiKey,
@@ -479,6 +506,8 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               location: this.location,
               locationRadius: this.locationRadius,
               order: this.order,
+              publishedAfter: calculatedPublishedAfter || this.publishedAfter,
+              publishedBefore: this.publishedBefore,
               q: this.q,
               safeSearch: this.safeSearch,
               topicId: this.topicId,
@@ -492,7 +521,37 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
             }
           });
 
-          this._youtubeApiParams = JSON.stringify(params);
+          // Since JSON.stringify(params) could produce different strings for effectively the same params values,
+          // (ordering is not guaranteed), first compare all the keys/values in the new params and the current
+          // this._youtubeApiParams to see if they're the same or not.
+          // Only set this._youtubeApiParams to JSON.stringify(params) if any keys or values have changed.
+          if (!this._youtubeApiParams || !this._paramsEqual(params, JSON.parse(this._youtubeApiParams))) {
+            this._youtubeApiParams = JSON.stringify(params);
+          }
+        },
+
+        // We can take some shortcuts since we know that there won't be any nested objects within the two param objects.
+        _paramsEqual: function(firstParams, secondParams) {
+          // First, check to make sure that for every key in firstParams, there's a key in secondParams, and both
+          // keys have values that are equal. If not, return false.
+          for (var key in firstParams) {
+            if (firstParams.hasOwnProperty(key)) {
+              if (firstParams[key] !== secondParams[key]) {
+                return false;
+              }
+            }
+          }
+
+          // Then, check to make sure that all the keys secondParams are also present in firstParams.
+          // If secondParams has a key that's not in firstParams, return false.
+          for (var key in secondParams) {
+            if (secondParams.hasOwnProperty(key) && !firstParams.hasOwnProperty(key)) {
+              return false;
+            }
+          }
+
+          // If those tests succeed, return true, since the keys/values in both sets of params match.
+          return true;
         },
 
         handleYouTubeApiResponse: function(e) {
@@ -514,9 +573,21 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
           if (response.nextPageToken && this._videos.length < this.maxVideos) {
             this._nextPageToken = response.nextPageToken;
 
-            if (this.$.resultspage.scroller.clientHeight == this.$.resultspage.scroller.scrollHeight) {
-              this.async(this.updateYouTubeApiParams);
-            }
+            this.async(function() {
+              // Additional pages of results are loaded dynamically when there's a scroll event and the user
+              // has scrolled close to the bottom of the container. (See this.handleResultsScroll)
+              // There's a bootstrapping issue, though, since if the initial request(s) don't return enough
+              // videos to trigger scroll bars, it's not possible for the user to trigger a scroll event and they're
+              // stuck with the initial results.
+              // Therefore, we check here to see whether there are no scroll bars (clientHeight == scrollHeight
+              // means there aren't any) and if there aren't, load in the next page of results.
+              // This check will be done each time there's an API response, so if the next page of results isn't
+              // enough to show scroll bars, another page will be loaded, until scroll bars are visible or until
+              // there are no more pages of results.
+              if (this.$.resultspage.scroller.clientHeight == this.$.resultspage.scroller.scrollHeight) {
+                this.updateYouTubeApiParams();
+              }
+            });
           } else if (this._videos.length > this.maxVideos) {
             // If we have more results that we require, truncate the array by setting its length.
             this._videos.length = this.maxVideos;
@@ -597,7 +668,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         },
 
         observe: {
-          'apiKey channelId location locationRadius maxResults order publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
+          'apiKey channelId goingBackDays location locationRadius maxResults order publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
             this._nextPageToken = '';
             this.updateYouTubeApiParams();
           }
@@ -617,6 +688,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         },
 
         ready: function() {
+          this._now = Date.now();
           this.updateYouTubeApiParams();
         }
       });
