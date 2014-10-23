@@ -38,7 +38,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 -->
 
 <polymer-element name="google-youtube-video-wall"
-                 attributes="apiKey channelId eventType location locationRadius maxResultsPerRequest maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
+                 attributes="apiKey channelId eventType goingBackDays location locationRadius maxResultsPerRequest maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
   <template>
     <link rel="stylesheet" href="google-youtube-video-wall.css">
 
@@ -235,6 +235,23 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
          * @default ''
          */
         eventType: '',
+
+        /**
+         * An optional filter that limits search results to videos published within the past `goingBackDays` number of days.
+         *
+         * This will dynamically set `this.publishedAfter` to a date roughly equal to `Date.now()` -  `goingBackDays` days.
+         * If set, it takes precedence over any value also set for the `this.publishedAfter` attribute.
+         *
+         * E.g.:
+         * - To only include videos published within the past 24 hours, set `goingBackDays` to `1`.
+         * - To only include videos published within the past 12 hours, set `goingBackDays` to `0.5`.
+         * - To only include videos published within the past week, set `goingBackDays` to `7`.
+         *
+         * @attribute goingBackDays
+         * @type number
+         * @default null
+         */
+        goingBackDays: null,
 
         /**
          * An optional search filter which limits the results to geotagged videos that are close to a specific location.
@@ -466,6 +483,16 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               maxResults: this.maxResultsPerRequest
             };
           } else {
+            var calculatedPublishedAfter;
+            if (this.goingBackDays !== null) {
+              // this._now is set once within ready().
+              // If we instead used a dynamic Date.now() value when setting calculatedPublishedAfter,
+              // it would come up with a slightly different date string each time,
+              // which would trigger a new search.
+              var then = this._now - (this.goingBackDays * 24 * 60 * 60 * 1000);
+              calculatedPublishedAfter = new Date(then).toISOString();
+            }
+
             this._youtubeApiService = 'search';
             params = {
               key: this.apiKey,
@@ -479,6 +506,8 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
               location: this.location,
               locationRadius: this.locationRadius,
               order: this.order,
+              publishedAfter: calculatedPublishedAfter || this.publishedAfter,
+              publishedBefore: this.publishedBefore,
               q: this.q,
               safeSearch: this.safeSearch,
               topicId: this.topicId,
@@ -597,7 +626,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         },
 
         observe: {
-          'apiKey channelId location locationRadius maxResults order publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
+          'apiKey channelId goingBackDays location locationRadius maxResults order publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
             this._nextPageToken = '';
             this.updateYouTubeApiParams();
           }
@@ -617,6 +646,7 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
         },
 
         ready: function() {
+          this._now = Date.now();
           this.updateYouTubeApiParams();
         }
       });
