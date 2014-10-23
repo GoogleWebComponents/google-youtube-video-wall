@@ -521,7 +521,32 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
             }
           });
 
-          this._youtubeApiParams = JSON.stringify(params);
+          // Since JSON.stringify(params) could produce different strings for effectively the same params values,
+          // (ordering is not guaranteed), first compare all the keys/values in the new params and the current
+          // this._youtubeApiParams to see if they're the same or not.
+          // Only set this._youtubeApiParams to JSON.stringify(params) if any keys or values have changed.
+          if (!this._youtubeApiParams || !this._paramsEqual(params, JSON.parse(this._youtubeApiParams))) {
+            this._youtubeApiParams = JSON.stringify(params);
+          }
+        },
+
+        // We can take some shortcuts since we know that there won't be any nested objects within the two param objects.
+        _paramsEqual: function(firstParams, secondParams) {
+          for (var key in firstParams) {
+            if (firstParams.hasOwnProperty(key)) {
+              if (firstParams[key] !== secondParams[key]) {
+                return false;
+              }
+            }
+          }
+
+          for (var key in secondParams) {
+            if (secondParams.hasOwnProperty(key) && !firstParams.hasOwnProperty(key)) {
+              return false;
+            }
+          }
+
+          return true;
         },
 
         handleYouTubeApiResponse: function(e) {
@@ -543,9 +568,11 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
           if (response.nextPageToken && this._videos.length < this.maxVideos) {
             this._nextPageToken = response.nextPageToken;
 
-            if (this.$.resultspage.scroller.clientHeight == this.$.resultspage.scroller.scrollHeight) {
-              this.async(this.updateYouTubeApiParams);
-            }
+            this.async(function() {
+              if (this.$.resultspage.scroller.clientHeight == this.$.resultspage.scroller.scrollHeight) {
+                this.updateYouTubeApiParams();
+              }
+            });
           } else if (this._videos.length > this.maxVideos) {
             // If we have more results that we require, truncate the array by setting its length.
             this._videos.length = this.maxVideos;
