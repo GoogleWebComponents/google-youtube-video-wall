@@ -532,6 +532,8 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
 
         // We can take some shortcuts since we know that there won't be any nested objects within the two param objects.
         _paramsEqual: function(firstParams, secondParams) {
+          // First, check to make sure that for every key in firstParams, there's a key in secondParams, and both
+          // keys have values that are equal. If not, return false.
           for (var key in firstParams) {
             if (firstParams.hasOwnProperty(key)) {
               if (firstParams[key] !== secondParams[key]) {
@@ -540,12 +542,15 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
             }
           }
 
+          // Then, check to make sure that all the keys secondParams are also present in firstParams.
+          // If secondParams has a key that's not in firstParams, return false.
           for (var key in secondParams) {
             if (secondParams.hasOwnProperty(key) && !firstParams.hasOwnProperty(key)) {
               return false;
             }
           }
 
+          // If those tests succeed, return true, since the keys/values in both sets of params match.
           return true;
         },
 
@@ -569,6 +574,16 @@ and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searche
             this._nextPageToken = response.nextPageToken;
 
             this.async(function() {
+              // Additional pages of results are loaded dynamically when there's a scroll event and the user
+              // has scrolled close to the bottom of the container. (See this.handleResultsScroll)
+              // There's a bootstrapping issue, though, since if the initial request(s) don't return enough
+              // videos to trigger scroll bars, it's not possible for the user to trigger a scroll event and they're
+              // stuck with the initial results.
+              // Therefore, we check here to see whether there are no scroll bars (clientHeight == scrollHeight
+              // means there aren't any) and if there aren't, load in the next page of results.
+              // This check will be done each time there's an API response, so if the next page of results isn't
+              // enough to show scroll bars, another page will be loaded, until scroll bars are visible or until
+              // there are no more pages of results.
               if (this.$.resultspage.scroller.clientHeight == this.$.resultspage.scroller.scrollHeight) {
                 this.updateYouTubeApiParams();
               }
