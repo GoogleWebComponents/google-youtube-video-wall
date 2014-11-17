@@ -1,0 +1,696 @@
+<link rel="import" href="../core-ajax/core-ajax.html">
+<link rel="import" href="../core-animated-pages/core-animated-pages.html">
+<link rel="import" href="../core-header-panel/core-header-panel.html">
+<link rel="import" href="../core-icon-button/core-icon-button.html">
+<link rel="import" href="../core-icon/core-icon.html">
+<link rel="import" href="../core-icons/core-icons.html">
+<link rel="import" href="../core-icons/av-icons.html">
+<link rel="import" href="../core-media-query/core-media-query.html">
+<link rel="import" href="../core-toolbar/core-toolbar.html">
+<link rel="import" href="../font-roboto/roboto.html">
+<link rel="import" href="../google-youtube/google-youtube.html">
+<link rel="import" href="../paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../paper-fab/paper-fab.html">
+<link rel="import" href="../paper-input/paper-input.html">
+<link rel="import" href="../paper-slider/paper-slider.html">
+<link rel="import" href="../paper-ripple/paper-ripple.html">
+<link rel="import" href="../polymer/polymer.html">
+
+
+<!--
+A video wall with [Material Design](http://www.google.com/design/spec/material-design/introduction.html) styling.
+It uses the Polymer [paper elements](https://www.polymer-project.org/docs/elements/paper-elements.html) for the interface,
+and the [YouTube Data API v3](https://developers.google.com/youtube/v3/) searches to populate the list of videos.
+
+##### Example
+
+    <google-youtube-video-wall apiKey="YOUTUBE API KEY"
+                               wallTitle="Google Developers Videos"
+                               channelId="UC_x5XG1OV2P6uZZ5FSM9Ttw"
+                               q="iobytes"
+                               showSearch>
+    </google-youtube-video-wall>
+
+@element google-youtube-video-wall
+@blurb An element for displaying collections of YouTube videos.
+@status alpha
+@homepage https://github.com/googlewebcomponents/google-youtube-video-wall
+-->
+
+<polymer-element name="google-youtube-video-wall"
+                 attributes="apiKey channelId eventType goingBackDays location locationRadius maxResultsPerRequest maxVideos narrowWidth order playlistId publishedAfter publishedBefore q safeSearch showSearch topicId veryNarrowWidth videoCategoryId wallTitle">
+  <template>
+    <link rel="stylesheet" href="google-youtube-video-wall.css">
+
+    <core-media-query query="max-width: {{narrowWidth}}" queryMatches="{{narrow}}"></core-media-query>
+    <core-media-query query="max-width: {{veryNarrowWidth}}" queryMatches="{{veryNarrow}}"></core-media-query>
+
+    <core-animated-pages fit
+                         id="corepage"
+                         transitions="hero-transition cross-fade"
+                         selected="0"
+                         on-core-animated-pages-transition-end="{{handleTransitionEnd}}">
+      <section>
+        <core-header-panel id="resultspage"
+                           fit
+                           cross-fade
+                           on-scroll="{{handleResultsScroll}}">
+          <core-toolbar class="{{ {'medium-tall': narrow && showSearch} | tokenList }}">
+            <header flex>
+              <content></content>
+              {{wallTitle}}
+            </header>
+
+            <template if="{{showSearch}}">
+              <core-icon icon="search" class="{{ {bottom: narrow} | tokenList }}"></core-icon>
+              <paper-input class="{{ {bottom: narrow} | tokenList }}"
+                           placeholder="Search for..."
+                           value="{{q}}">
+              </paper-input>
+            </template>
+          </core-toolbar>
+
+          <div id="searchresults" class="{{ {veryNarrow: veryNarrow} | tokenList }}" hero-p>
+            <template if="{{_apiError}}">
+              <h1>Oops! The following error occurred:</h1>
+              <pre>{{_apiError}}</pre>
+            </template>
+
+            <template if="{{_videos != null && _videos.length == 0}}">
+              <h1>Sorry, no videos were found!</h1>
+            </template>
+
+            <template repeat="{{video in _videos}}">
+              <div class="video-container"
+                   data-video-id="{{video.id.videoId || video.snippet.resourceId.videoId}}"
+                   data-video-title="{{video.snippet.title}}"
+                   data-is-live="{{video.snippet.liveBroadcastContent === 'live'}}"
+                   on-click="{{handleItemSelected}}">
+                <paper-ripple fit></paper-ripple>
+
+                <img src="{{video.snippet.thumbnails.medium.url}}"
+                     hero-id="{{video.id.videoId}}"
+                     hero?="{{video.id.videoId === _selectedVideoId}}">
+                <div class="text-container">
+                  <h1>{{video.snippet.title}}</h1>
+                  <p>{{video.snippet.description}}</p>
+                </div>
+              </div>
+            </template>
+          </div>
+        </core-header-panel>
+      </section>
+
+      <section>
+        <div id="playerpage" fit cross-fade class="{{ {narrow: narrow} | tokenList }}">
+          <template if="{{_selectedVideoId}}">
+            <paper-icon-button id="close-button"
+                               icon="close"
+                               fill
+                               on-tap="{{handlePlayerClose}}">
+            </paper-icon-button>
+
+            <google-youtube id="youtubeplayer"
+                            videoid="{{_selectedVideoId}}"
+                            playsupported="{{playSupported}}"
+                            chromeless
+                            width="100%"
+                            height="100%"
+                            currenttime="{{currentTime}}"
+                            currenttimeformatted="{{currentTimeFormatted}}"
+                            fractionloaded="{{fractionLoaded}}"
+                            state="{{state}}"
+                            duration="{{duration}}"
+                            durationformatted="{{durationFormatted}}"
+                            hero-id="{{_selectedVideoId}}"
+                            hero>
+            </google-youtube>
+          </template>
+
+          <paper-slider id="seekbar"
+                        min="0"
+                        max="{{duration}}"
+                        value="{{currentTime}}"
+                        secondaryProgress="{{ fractionLoaded * duration }}"
+                        on-change="{{handleSeekTo}}"
+                        disabled?="{{duration == 0}}">
+          </paper-slider>
+
+          <core-toolbar id="playercontrols" class="{{ {'medium-tall': narrow} | tokenList }}">
+            <template if="{{state == 1 || state == 3}}">
+              <paper-fab class="{{ {bottom: narrow} | tokenList }}"
+                         mini
+                         icon="av:pause"
+                         on-tap="{{handlePause}}">
+              </paper-fab>
+            </template>
+
+            <template if="{{state != 1 && state != 3 && playSupported}}">
+              <paper-fab class="{{ {bottom: narrow} | tokenList }}"
+                         mini
+                         icon="av:play-arrow"
+                         on-tap="{{handlePlay}}">
+              </paper-fab>
+            </template>
+
+            <p flex class="video-title">{{_selectedVideoTitle}}</p>
+
+            <p class="{{ {bottom: narrow} | tokenList }}">
+              <template if="{{duration != 0 && !_selectedVideoIsLive}}">
+                {{currentTimeFormatted}}/{{durationFormatted}}
+              </template>
+
+              <template if="{{_selectedVideoIsLive}}">
+                Live Broadcast
+              </template>
+            </p>
+          </core-toolbar>
+        </div>
+      </section>
+    </core-animated-pages>
+
+    <template if="{{_youtubeApiParams && _youtubeApiService}}">
+      <core-ajax auto
+                 url="https://www.googleapis.com/youtube/v3/{{_youtubeApiService}}"
+                 params="{{_youtubeApiParams}}"
+                 handleAs="json"
+                 on-core-response="{{handleYouTubeApiResponse}}"
+                 on-core-error="{{handleYouTubeApiError}}">
+      </core-ajax>
+    </template>
+
+    <core-ajax id="titleajax"
+               url="https://www.googleapis.com/youtube/v3/playlists"
+               params='{"part": "snippet", "id": "{{playlistId}}", "key": "{{apiKey}}"}'
+               handleAs="json"
+               on-core-response="{{handlePlaylistTitleResponse}}"
+               on-core-error="{{handleYouTubeApiError}}">
+    </core-ajax>
+  </template>
+
+  <script>
+      Polymer({
+        /**
+         * API key to use for YouTube Data API v3 calls.
+         *
+         * Setting this value to an API key that you register for is required.
+         * Also ensure that the Google Developers Console project associated with the key
+         * has the YouTube Data API v3 enabled.
+         *
+         * More information on registration is available in the [YouTube API documentation](https://developers.google.com/youtube/registering_an_application).
+         *
+         * @attribute apiKey
+         * @type string
+         * @default ''
+         */
+        apiKey: '',
+
+        /**
+         * An optional search filter which limits the results to videos in a single YouTube channel.
+         *
+         * The value must be a valid YouTube channel id, *not* a channel name (which is not guaranteed to be unique).
+         * YouTube channel ids traditionally begin with the characters 'UC'.
+         * An easy way to look up the channel id for a given channel name is to use the [API Explorer](https://developers.google.com/apis-explorer/#p/youtube/v3/youtube.channels.list?part=id&forUsername=GoogleDevelopers)
+         * with the `forUsername` field set to the channel name you're interested in.
+         *
+         * This corresponds to the [`channelId`](https://developers.google.com/youtube/v3/docs/search/list#channelId)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute channelId
+         * @type string
+         * @default ''
+         */
+        channelId: '',
+
+        /**
+         * An optional search filter which limits the results to videos that are/were livestreamed.
+         *
+         * Acceptable values are `completed`, `live`, or `upcoming`.
+         *
+         * This corresponds to the [`eventType`](https://developers.google.com/youtube/v3/docs/search/list#eventType)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute eventType
+         * @type string
+         * @default ''
+         */
+        eventType: '',
+
+        /**
+         * An optional filter that limits search results to videos published within the past `goingBackDays` number of days.
+         *
+         * This will dynamically set `this.publishedAfter` to a date roughly equal to `Date.now()` -  `goingBackDays` days.
+         * If set, it takes precedence over any value also set for the `this.publishedAfter` attribute.
+         *
+         * E.g.:
+         * - To only include videos published within the past 24 hours, set `goingBackDays` to `1`.
+         * - To only include videos published within the past 12 hours, set `goingBackDays` to `0.5`.
+         * - To only include videos published within the past week, set `goingBackDays` to `7`.
+         *
+         * @attribute goingBackDays
+         * @type number
+         * @default null
+         */
+        goingBackDays: null,
+
+        /**
+         * An optional search filter which limits the results to geotagged videos that are close to a specific location.
+         *
+         * To use this, you must set the `locationRadius` property as well.
+         *
+         * This corresponds to the [`location`](https://developers.google.com/youtube/v3/docs/search/list#location)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute location
+         * @type string
+         * @default ''
+         */
+        location: '',
+
+        /**
+         * An optional search filter which limits the results to geotagged videos that are close to a specific location.
+         *
+         * To use this, you must set the `location` property as well.
+         *
+         * This corresponds to the [`locationRadius`](https://developers.google.com/youtube/v3/docs/search/list#location)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute locationRadius
+         * @type string
+         * @default ''
+         */
+        locationRadius: '',
+
+        /**
+         * The maximum number of videos to retrieve in total.
+         *
+         * @attribute maxVideos
+         * @type number
+         * @default 500
+         */
+        maxVideos: 500,
+
+        /**
+         * The maximum number of videos to retrieve in a single API call.
+         *
+         * It's recommended to leave this value at the default.
+         *
+         * Valid values are `1` through `50`, inclusive.
+         *
+         * @attribute maxResultsPerRequest
+         * @type number
+         * @default 50
+         */
+        maxResultsPerRequest: 50,
+
+        /**
+         * The cut-off point determining when the page's responsive layout rearranges elements.
+         *
+         * If the browser's width is smaller than this, elements will be rearranged.
+         *
+         * This can normally be left at the default, but if you know that, e.g., the
+         * `<google-youtube-video-wall>` is only taking up 50% of the browser's width, you might
+         * want to adjust this value to trigger rearrangement at 1200px.
+         *
+         * @attribute narrowWidth
+         * @type string
+         * @default '600px'
+         */
+        narrowWidth: '600px',
+
+        /**
+         * The order in which search results are returned.
+         *
+         * This corresponds to the [`order`](https://developers.google.com/youtube/v3/docs/search/list#order)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute order
+         * @type string
+         * @default 'relevance'
+         */
+        order: 'relevance',
+
+        /**
+         * If `playlistId` is specified, then the video wall will be populated with the contents of that YouTube playlist.
+         *
+         * Any search-related attributes will be ignored as long this attribute is set.
+         *
+         * `this.showSearch` will be set to `false`, since it's not possible to filter the contents of a playlist based
+         * on a search term using the YouTube Data API v3.
+         *
+         * @attribute playlistId
+         * @type string
+         * @default ''
+         */
+        playlistId: '',
+
+        /**
+         * An optional search filter which limits the results to videos that were published after a certain date.
+         *
+         * If set, you must use an [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt)
+         * formatted date-time value (e.g. `'1970-01-01T00:00:00Z'`).
+         *
+         * This corresponds to the [`publishedAfter`](https://developers.google.com/youtube/v3/docs/search/list#publishedAfter)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute publishedAfter
+         * @type string
+         * @default ''
+         */
+        publishedAfter: '',
+
+        /**
+         * An optional search filter which limits the results to videos that were published before a certain date.
+         *
+         * If set, you must use an [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt)
+         * formatted date-time value (e.g. `'1970-01-01T00:00:00Z'`).
+         *
+         * This corresponds to the [`publishedBefore`](https://developers.google.com/youtube/v3/docs/search/list#publishedBefore)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute publishedBefore
+         * @type string
+         * @default ''
+         */
+        publishedBefore: '',
+
+        /**
+         * An optional search filter which limits the results to videos that match the specified string.
+         *
+         * This corresponds to the [`q`](https://developers.google.com/youtube/v3/docs/search/list#q)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute q
+         * @type string
+         * @default ''
+         */
+        q: '',
+
+        /**
+         * An optional search filter which determines whether restricted content is returned in the results.
+         *
+         * This corresponds to the [`safeSearch`](https://developers.google.com/youtube/v3/docs/search/list#safeSearch)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute safeSearch
+         * @type string
+         * @default 'moderate'
+         */
+        safeSearch: 'moderate',
+
+        /**
+         * Whether or not to allow users to enter their own search terms to narrow down results.
+         *
+         * @attribute showSearch
+         * @type boolean
+         * @default false
+         */
+        showSearch: false,
+
+        /**
+         * An optional search filter which limits the results to videos that match the specified topic id.
+         *
+         * Topic ids traditionally begin with the prefix `/m/`.
+         * You can use the [Freebase API](https://developers.google.com/freebase/index) to look up the id for a specific topic.
+         *
+         * This corresponds to the [`topicId`](https://developers.google.com/youtube/v3/docs/search/list#topicId)
+         * parameter in a YouTube API search request.
+         *
+         * @attribute topicId
+         * @type string
+         * @default ''
+         */
+        topicId: '',
+
+        /**
+         * The cut-off point determining when the page's responsive layout rearranges elements.
+         *
+         * If the browser's width is smaller than this, elements will be rearranged.
+         *
+         * This can normally be left at the default, but if you know that, e.g., the
+         * `<google-youtube-video-wall>` is only taking up 50% of the browser's width, you might
+         * want to adjust this value to trigger rearrangement at 900px.
+         *
+         * @attribute narrowWidth
+         * @type string
+         * @default '450px'
+         */
+        veryNarrowWidth: '450px',
+
+        /**
+         * An optional search filter which limits the results to videos that fall into a specific YouTube category.
+         *
+         * You can obtain a list of video category ids from the [API Explorer](https://developers.google.com/apis-explorer/#p/youtube/v3/youtube.videoCategories.list?part=snippet&regionCode=us).
+         * The change very infrequently, and it is generally safe to hardcode a video category id once you look it up.
+         *
+         * @attribute videoCategoryId
+         * @type string
+         * @default ''
+         */
+        videoCategoryId: '',
+
+        /**
+         * Title displayed in the video wall header.
+         *
+         * @attribute wallTitle
+         * @type string
+         * @default ''
+         */
+        wallTitle: '',
+
+        // Placeholder, since the YT Player doesn't like being initialized without a video id.
+        _selectedVideoId: 'mN7IAaRdi_k',
+        _selectedVideoTitle: '',
+        _selectedVideoIsLive: false,
+        _nextPageToken: '',
+        // This will be set to either 'search' or 'playlistItems', depending on the other attributes.
+        _youtubeApiService: '',
+        _youtubeApiParams: '',
+        _videos: null,
+        _apiError: '',
+
+        updateYouTubeApiParams: function() {
+          var params;
+
+          if (this.playlistId) {
+            this.showSearch = false;
+            this._youtubeApiService = 'playlistItems';
+            params = {
+              key: this.apiKey,
+              part: 'snippet',
+              pageToken: this._nextPageToken,
+              playlistId: this.playlistId,
+              maxResults: this.maxResultsPerRequest
+            };
+          } else {
+            var calculatedPublishedAfter;
+            if (this.goingBackDays !== null) {
+              // this._now is set once within ready().
+              // If we instead used a dynamic Date.now() value when setting calculatedPublishedAfter,
+              // it would come up with a slightly different date string each time,
+              // which would trigger a new search.
+              var then = this._now - (this.goingBackDays * 24 * 60 * 60 * 1000);
+              calculatedPublishedAfter = new Date(then).toISOString();
+            }
+
+            this._youtubeApiService = 'search';
+            params = {
+              key: this.apiKey,
+              part: 'snippet',
+              pageToken: this._nextPageToken,
+              type: 'video',
+              videoEmbeddable: 'true',
+              maxResults: this.maxResultsPerRequest,
+              channelId: this.channelId,
+              eventType: this.eventType,
+              location: this.location,
+              locationRadius: this.locationRadius,
+              order: this.order,
+              publishedAfter: calculatedPublishedAfter || this.publishedAfter,
+              publishedBefore: this.publishedBefore,
+              q: this.q,
+              safeSearch: this.safeSearch,
+              topicId: this.topicId,
+              videoCategoryId: this.videoCategoryId
+            };
+          }
+
+          Object.keys(params).forEach(function(key) {
+            if (params[key] === '') {
+              delete(params[key]);
+            }
+          });
+
+          // Since JSON.stringify(params) could produce different strings for effectively the same params values,
+          // (ordering is not guaranteed), first compare all the keys/values in the new params and the current
+          // this._youtubeApiParams to see if they're the same or not.
+          // Only set this._youtubeApiParams to JSON.stringify(params) if any keys or values have changed.
+          if (!this._youtubeApiParams || !this._paramsEqual(params, JSON.parse(this._youtubeApiParams))) {
+            this._youtubeApiParams = JSON.stringify(params);
+          }
+        },
+
+        // We can take some shortcuts since we know that there won't be any nested objects within the two param objects.
+        _paramsEqual: function(firstParams, secondParams) {
+          // First, check to make sure that for every key in firstParams, there's a key in secondParams, and both
+          // keys have values that are equal. If not, return false.
+          for (var key in firstParams) {
+            if (firstParams.hasOwnProperty(key)) {
+              if (firstParams[key] !== secondParams[key]) {
+                return false;
+              }
+            }
+          }
+
+          // Then, check to make sure that all the keys secondParams are also present in firstParams.
+          // If secondParams has a key that's not in firstParams, return false.
+          for (var key in secondParams) {
+            if (secondParams.hasOwnProperty(key) && !firstParams.hasOwnProperty(key)) {
+              return false;
+            }
+          }
+
+          // If those tests succeed, return true, since the keys/values in both sets of params match.
+          return true;
+        },
+
+        handleYouTubeApiResponse: function(e) {
+          this._apiError = '';
+          var response = e.detail.response;
+
+          // If there are already some results and this is the next page of results, concatenate.
+          if (this._videos && this._nextPageToken) {
+            for (var i = 0; i < response.items.length; i++) {
+              this._videos.push(response.items[i]);
+            }
+          } else {
+            // Scroll to the top so that the first row of new results are visible.
+            this.$.resultspage.scroller.scrollTop = 0;
+
+            this._videos = response.items;
+          }
+
+          if (response.nextPageToken && this._videos.length < this.maxVideos) {
+            this._nextPageToken = response.nextPageToken;
+
+            this.async(function() {
+              // Additional pages of results are loaded dynamically when there's a scroll event and the user
+              // has scrolled close to the bottom of the container. (See this.handleResultsScroll)
+              // There's a bootstrapping issue, though, since if the initial request(s) don't return enough
+              // videos to trigger scroll bars, it's not possible for the user to trigger a scroll event and they're
+              // stuck with the initial results.
+              // Therefore, we check here to see whether there are no scroll bars (clientHeight == scrollHeight
+              // means there aren't any) and if there aren't, load in the next page of results.
+              // This check will be done each time there's an API response, so if the next page of results isn't
+              // enough to show scroll bars, another page will be loaded, until scroll bars are visible or until
+              // there are no more pages of results.
+              if (this.$.resultspage.scroller.clientHeight == this.$.resultspage.scroller.scrollHeight) {
+                this.updateYouTubeApiParams();
+              }
+            });
+          } else if (this._videos.length > this.maxVideos) {
+            // If we have more results that we require, truncate the array by setting its length.
+            this._videos.length = this.maxVideos;
+          }
+        },
+
+        handlePlaylistTitleResponse: function(e) {
+          this._apiError = '';
+          var response = e.detail.response;
+
+          if (response.items) {
+            this.wallTitle = response.items[0].snippet.title;
+          }
+        },
+
+        handleYouTubeApiError: function(e) {
+          if (e.detail.response.indexOf('keyInvalid') >= 0) {
+            this._apiError = 'Missing or invalid API key. Please see the <google-youtube-video-wall> ' +
+              'documentation for information on setting the "apiKey" property to a valid value.'
+          } else {
+            this._apiError = e.detail.response;
+          }
+        },
+
+        handleItemSelected: function(e) {
+          // Wait before starting the transition to the play page to give the paper-ripple effect time to animate.
+          this.async(function(args) {
+            this._selectedVideoTitle = args.title;
+            this._selectedVideoId = args.videoId;
+            this._selectedVideoIsLive = args.isLive === 'true';
+            this.$.corepage.selected = 1;
+          }, {
+            title: e.target.parentNode.dataset.videoTitle,
+            videoId: e.target.parentNode.dataset.videoId,
+            isLive: e.target.parentNode.dataset.isLive
+          }, 150);
+        },
+
+        handlePlayerClose: function() {
+          // Wait before starting the transition to the results page to give the paper-ripple effect time to animate.
+          this.async(function() {
+            this.shadowRoot.querySelector('#youtubeplayer').pause();
+            this.$.corepage.selected = 0;
+            this.playSupported = null;
+
+            this.state = -1;
+            this.fractionLoaded = 0;
+          }, null, 75);
+        },
+
+        handlePlay: function() {
+          this.shadowRoot.querySelector('#youtubeplayer').play();
+        },
+
+        handlePause: function() {
+          this.shadowRoot.querySelector('#youtubeplayer').pause();
+        },
+
+        handleSeekTo: function(e) {
+          this.shadowRoot.querySelector('#youtubeplayer').seekTo(this.$.seekbar.immediateValue);
+        },
+
+        handleTransitionEnd: function() {
+          // If we've transitioned from the player to the results page, reset _selectedVideoId
+          // so that the next <google-youtube> player element is "fresh".
+          // We can't reset it prior to the transition since it will mess up the hero-id mapping.
+          if (this.$.corepage.selected == 0) {
+            this._selectedVideoId = '';
+          }
+        },
+
+        handleResultsScroll: function(e) {
+          // 320 is the height of the video container, so this check is roughly equivalent to
+          // "is the bottom of the scroll area on the second-to-last row?"
+          if ((e.detail.target.scrollTop + e.detail.target.clientHeight + 320) >= e.detail.target.scrollHeight) {
+            this.async(this.updateYouTubeApiParams);
+          }
+        },
+
+        observe: {
+          'apiKey channelId goingBackDays location locationRadius maxResults order publishedAfter publishedBefore q safeSearch topicId videoCategoryId': function() {
+            this._nextPageToken = '';
+            this.updateYouTubeApiParams();
+          }
+        },
+
+        playlistIdChanged: function() {
+          // Check to make sure that playlistId isn't being reset to something false...
+          if (this.playlistId) {
+            // Only overwrite this.wallTitle if it's not being explicitly set by the element.
+            if(!this.hasAttribute('wallTitle')) {
+              this.$.titleajax.go();
+            }
+
+            this._nextPageToken = '';
+            this.updateYouTubeApiParams();
+          }
+        },
+
+        ready: function() {
+          this._now = Date.now();
+          this.updateYouTubeApiParams();
+        }
+      });
+  </script>
+</polymer-element>

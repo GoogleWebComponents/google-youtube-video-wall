@@ -1,0 +1,7 @@
+{
+  "name": "google-youtube-video-wall#gh-pages",
+  "private": true,
+  "dependencies": {
+    "google-youtube-video-wall": "googlewebcomponents/google-youtube-video-wall#master"
+  }
+}
